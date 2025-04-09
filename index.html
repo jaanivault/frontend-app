@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Auth</title>
+</head>
+<body>
+  <h2>Register</h2>
+  <form id="registerForm">
+    <input type="text" placeholder="Name" name="name" required><br>
+    <input type="email" placeholder="Email" name="email" required><br>
+    <input type="password" placeholder="Password" name="password" required><br>
+    <button type="submit">Register</button>
+  </form>
+
+  <h2>Login</h2>
+  <form id="loginForm">
+    <input type="email" placeholder="Email" name="email" required><br>
+    <input type="password" placeholder="Password" name="password" required><br>
+    <button type="submit">Login</button>
+  </form>
+
+  <h2>Forgot Password</h2>
+  <form id="forgotForm">
+    <input type="email" placeholder="Email" name="email" required><br>
+    <button type="submit">Send Reset Code</button>
+  </form>
+
+  <h2>Reset Password</h2>
+  <form id="resetForm">
+    <input type="email" placeholder="Email" name="email" required><br>
+    <input type="text" placeholder="Reset Code" name="code" required><br>
+    <input type="password" placeholder="New Password" name="newPassword" required><br>
+    <button type="submit">Reset Password</button>
+  </form>
+  <!-- 🧰 VAULT SECTION (HIDDEN BY DEFAULT) -->
+<div id="vault" style="display: none;">
+  <h2>Welcome to Your Vault 🔐</h2>
+
+<!-- 🔍 Search and Sort -->
+<div>
+  <input type="text" id="searchInput" placeholder="Search by name..." />
+  <select id="sortSelect">
+    <option value="newest">Newest</option>
+    <option value="oldest">Oldest</option>
+    <option value="name">Name</option>
+  </select>
+  <button onclick="fetchFiles()">Apply</button>
+</div>
+
+
+
+
+  <!-- 📤 Upload Form -->
+  <!-- 📤 Upload Form -->
+<form id="uploadForm">
+  <input type="file" name="file" required />
+  <input type="text" name="folder" placeholder="Enter folder/category (optional)" />
+  <button type="submit">Upload</button>
+</form>
+
+
+  <!-- 📂 File List -->
+  <div id="fileList"></div>
+  
+
+
+  <button id="logoutBtn">Logout</button>
+</div>
+
+  <script>
+   const baseURL = "https://backend-app-v4e7.onrender.com/api";
+
+
+    // REGISTER
+    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const res = await fetch(`${baseURL}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.value,
+          email: form.email.value,
+          password: form.password.value,
+        }),
+      });
+      const data = await res.json();
+      alert(data.message || "Registered successfully!");
+    });
+
+    // LOGIN
+    // LOGIN
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const email = form.email.value.trim().toLowerCase();
+  const password = form.password.value.trim();
+
+  
+
+  const res = await fetch(`${baseURL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await res.json();
+
+  if (res.ok) {
+    alert("✅ Login successful!");
+    
+    // Save token to localStorage (optional)
+    localStorage.setItem("token", data.token);
+
+    // Hide forms
+    document.getElementById("registerForm").style.display = "none";
+    document.getElementById("loginForm").style.display = "none";
+    document.getElementById("forgotForm").style.display = "none";
+    document.getElementById("resetForm").style.display = "none";
+
+    // Show vault
+    document.getElementById("vault").style.display = "block";
+
+    // Optional: call fetchUserFiles() here to load files on login
+    // fetchUserFiles();
+  } else {
+    alert(data.message || "Login failed!");
+  }
+});
+
+
+
+
+    // FORGOT PASSWORD
+    document.getElementById("forgotForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const res = await fetch(`${baseURL}/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email.value,
+        }),
+      });
+      const data = await res.json();
+      alert(data.message || "Reset code sent!");
+    });
+
+    // RESET PASSWORD
+   // RESET PASSWORD
+document.getElementById("resetForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+
+  console.log("📤 Sending Reset Request:", {
+    email: form.email.value,
+    resetCode: form.code.value,
+    newPassword: form.newPassword.value,
+  });
+
+  const res = await fetch(`${baseURL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: form.email.value,
+      resetCode: form.code.value,  // ✅ CORRECTED HERE
+      newPassword: form.newPassword.value,
+    }),
+  });
+
+  const data = await res.json();
+  alert(data.message || "Password reset!");
+});
+
+
+// AUTO-LOGIN CHECK
+window.addEventListener("DOMContentLoaded", () => {
+  const token = localStorage.getItem("token");
+
+  if (token) {
+    
+    document.getElementById("registerForm").style.display = "none";
+    document.getElementById("loginForm").style.display = "none";
+    document.getElementById("forgotForm").style.display = "none";
+    document.getElementById("resetForm").style.display = "none";
+    document.getElementById("vault").style.display = "block";
+
+    fetchUserFiles(); // 👈 Load files on page load if logged in
+  }
+});
+
+
+
+// 🔃 Fetch user's uploaded files
+async function fetchUserFiles() {
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${baseURL}/files`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const files = await res.json();
+
+  const fileListDiv = document.getElementById("fileList");
+  fileListDiv.innerHTML = ""; // Clear previous
+
+  if (files.length === 0) {
+    fileListDiv.innerHTML = "<p>No files uploaded yet.</p>";
+    return;
+  }
+
+  files.forEach((file) => {
+  const fileItem = document.createElement("div");
+
+  let previewHTML = "";
+
+  if (file.url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+    // Image Preview
+    previewHTML = `<img src="${file.url}" width="200" alt="Image preview" />`;
+  } else if (file.url.match(/\.(mp4|webm|ogg)$/i)) {
+    // Video Preview
+    previewHTML = `<video width="320" controls><source src="${file.url}" type="video/mp4">Your browser does not support the video tag.</video>`;
+  } else if (file.url.match(/\.(mp3|wav)$/i)) {
+    // Audio Preview
+    previewHTML = `<audio controls><source src="${file.url}" type="audio/mpeg">Your browser does not support the audio element.</audio>`;
+  } else if (file.url.match(/\.pdf$/i)) {
+    // PDF Preview
+    previewHTML = `<iframe src="${file.url}" width="100%" height="300px"></iframe>`;
+  } else {
+    // Unknown file type, just show download option
+    previewHTML = `<p>🔒 File preview not available</p>`;
+  }
+
+  fileItem.innerHTML = `
+    <strong>📄 ${file.originalname || file.filename}</strong><br>
+    ${previewHTML}
+    <br>
+    <a href="${file.url}" target="_blank">🔗 View</a> |
+    <button onclick="downloadFile('${file._id}', '${token}')">⬇️ Download</button>
+
+    <button onclick="deleteFile('${file._id}')">❌ Delete</button>
+    <hr>
+  `;
+
+  fileListDiv.appendChild(fileItem);
+});
+
+
+}
+
+// 📤 Upload file
+document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const token = localStorage.getItem("token");
+
+  const formData = new FormData();
+  formData.append("file", e.target.file.files[0]);
+
+  const res = await fetch(`${baseURL}/files/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  const data = await res.json();
+  alert(data.message || "File uploaded!");
+
+  e.target.reset();
+  fetchUserFiles(); // Refresh file list
+});
+
+
+//download file 
+const downloadFile = async (fileId) => {
+  const token = localStorage.getItem("token");
+
+  try {
+    const res = await fetch(`${baseURL}/files/download/${fileId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Download failed");
+    }
+
+    // ✅ Extract filename from the response header
+    const disposition = res.headers.get("Content-Disposition");
+    let filename = "downloaded_file";
+
+    if (disposition && disposition.includes("filename=")) {
+      filename = disposition.split("filename=")[1].replace(/['"]/g, "");
+    }
+
+    // 📥 Download
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename; // 💡 dynamic name
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Download failed:", err);
+    alert("Download failed. Please try again.");
+  }
+};
+
+
+
+
+
+
+
+// ❌ Delete file
+async function deleteFile(id) {
+  const token = localStorage.getItem("token");
+
+  try {
+    const res = await fetch(`${baseURL}/files/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to delete file.");
+    }
+
+    alert(data.message || "File deleted successfully!");
+
+    // Refresh the file list
+    fetchUserFiles();
+  } catch (error) {
+    console.error("Delete failed:", error);
+    alert("Error deleting file: " + error.message);
+  }
+}
+
+
+
+// LOGOUT
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  localStorage.removeItem("token");
+
+  // Show forms again
+  document.getElementById("registerForm").style.display = "block";
+  document.getElementById("loginForm").style.display = "block";
+  document.getElementById("forgotForm").style.display = "block";
+  document.getElementById("resetForm").style.display = "block";
+
+  // Hide vault
+  document.getElementById("vault").style.display = "none";
+});
+
+
+
+  </script>
+</body>
+</html>
+
+
+
+
+
